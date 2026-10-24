@@ -3,9 +3,10 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'jenkins-cicd-demo'
-        CONTAINER_NAME = 'jenkins-cicd-app'
-    }
+    PATH+DOCKER = '/usr/local/bin'
+    IMAGE_NAME = 'jenkins-cicd-demo'
+    CONTAINER_NAME = 'jenkins-cicd-app'
+}
 
     stages {
         stage('Build') {
