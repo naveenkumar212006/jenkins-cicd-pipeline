@@ -3,21 +3,35 @@ pipeline {
     agent any
 
     environment {
-    PATH+DOCKER = '/usr/local/bin'
-    IMAGE_NAME = 'jenkins-cicd-demo'
-    CONTAINER_NAME = 'jenkins-cicd-app'
-}
+        IMAGE_NAME = 'jenkins-cicd-demo'
+        CONTAINER_NAME = 'jenkins-cicd-app'
+    }
 
     stages {
+        stage('Check Docker') {
+            steps {
+                sh '''
+                    export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+                    which docker
+                    docker --version
+                    docker ps
+                '''
+            }
+        }
+
         stage('Build') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+                sh '''
+                    export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+                    docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                '''
             }
         }
 
         stage('Test') {
             steps {
                 sh '''
+                    export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
                     docker rm -f ${CONTAINER_NAME} || true
 
                     docker run -d \
@@ -43,11 +57,12 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
+                    export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
                     docker rm -f ${CONTAINER_NAME} || true
 
                     docker run -d \
-                        --name ${CONTAINER_NAME} \
                         --restart unless-stopped \
+                        --name ${CONTAINER_NAME} \
                         -p 8081:80 \
                         ${IMAGE_NAME}:${BUILD_NUMBER}
 
@@ -55,14 +70,16 @@ pipeline {
                         ${IMAGE_NAME}:${BUILD_NUMBER} \
                         ${IMAGE_NAME}:latest
                 '''
-                echo 'Application deployed successfully!'
             }
         }
     }
 
     post {
         always {
-            sh 'docker rm -f ${CONTAINER_NAME} || true'
+            sh '''
+                export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+                docker rm -f ${CONTAINER_NAME} || true
+            '''
         }
 
         success {
