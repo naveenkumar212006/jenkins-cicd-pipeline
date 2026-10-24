@@ -2,65 +2,74 @@
 pipeline {
     agent any
 
-    options {
-        timestamps()
+    environment {
+        IMAGE_NAME = 'jenkins-cicd-demo'
+        CONTAINER_NAME = 'jenkins-cicd-app'
     }
 
     stages {
         stage('Build') {
             steps {
-                echo 'Building the application...'
-
-                sh '''
-                    test -f app/index.html
-                    mkdir -p public
-                    cp app/index.html public/index.html
-                '''
-
-                echo 'Build completed successfully!'
+                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Testing the application...'
-
                 sh '''
-                    test -s public/index.html
-                    grep -q "Jenkins CI/CD Pipeline" public/index.html
-                    grep -q "Build, Test and Deploy" public/index.html
-                '''
+                    docker rm -f ${CONTAINER_NAME} || true
 
-                echo 'All tests passed!'
+                    docker run -d \
+                        --name ${CONTAINER_NAME} \
+                        -p 127.0.0.1:18081:80 \
+                        ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    for i in $(seq 1 15); do
+                        if curl -fsS http://127.0.0.1:18081/ \
+                            -o /dev/null; then
+                            echo "Container test passed"
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    echo "Container test failed"
+                    exit 1
+                '''
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying the application...'
-
                 sh '''
-                    mkdir -p deployed
-                    cp public/index.html deployed/index.html
-                    test -s deployed/index.html
-                '''
+                    docker rm -f ${CONTAINER_NAME} || true
 
-                echo 'Application deployed to the workspace!'
+                    docker run -d \
+                        --name ${CONTAINER_NAME} \
+                        --restart unless-stopped \
+                        -p 8081:80 \
+                        ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    docker image tag \
+                        ${IMAGE_NAME}:${BUILD_NUMBER} \
+                        ${IMAGE_NAME}:latest
+                '''
+                echo 'Application deployed successfully!'
             }
         }
     }
 
     post {
+        always {
+            sh 'docker rm -f ${CONTAINER_NAME} || true'
+        }
+
         success {
-            echo 'CI/CD Pipeline completed successfully!'
+            echo 'CI/CD pipeline completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check the console output.'
-        }
-
-        always {
-            echo 'Pipeline execution finished.'
+            echo 'Pipeline failed. Check Console Output.'
         }
     }
 }
